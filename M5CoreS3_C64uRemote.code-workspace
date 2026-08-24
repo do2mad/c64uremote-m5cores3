@@ -1,0 +1,17 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"name": "M5Dial-C64uRemote",
+			"path": "../M5Dial-C64uRemote"
+		}
+	],
+	"settings": {
+		"files.associations": {
+			"*.h": "cpp",
+			"*.cpp": "cpp"
+		}
+	}
+}
