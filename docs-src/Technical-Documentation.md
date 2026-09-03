@@ -382,6 +382,25 @@ Specific Settings", otherwise across all categories (`resolveCpuPath`). The
 available values come from the item's `values` array; a fixed list serves as a
 fallback (`setFallbackCpuChoices`).
 
+## Joystick ports
+
+There is no `machine:` command for swapping the joystick ports. The mapping is a
+configuration item - in testing *Joystick Swapper* in the category *U64 Specific
+Settings*, with the values `Normal`, `Swapped`, `WASD Port 2` and `WASD Port 1`.
+It is therefore set through `/v1/configs/<category>/<item>?value=…`, exactly like
+the clock speed.
+
+As with the clock, `resolveJoyPath()` looks in *U64 Specific Settings* first and
+otherwise walks all categories until an item name contains "Joystick", so a later
+firmware renaming it goes unnoticed. `refreshJoyChoices()` reads `values` and
+`current`.
+
+`joyTokenFromValue()` and `joyValueFromToken()` convert between the device value
+and the card token (`WASD Port 1` <-> `WASD1`), so a card needs neither a blank
+nor a firmware-specific spelling. `toggleJoystickSwap()` toggles between `Normal`
+and `Swapped` and returns to `Normal` from a WASD mode; `cycleJoystickValue()`
+walks through every reported value in the setup list.
+
 ## Disk images and autostart
 
 When mounting, the target drive is determined (`resolveTargetDrive`): with "Auto"
@@ -510,6 +529,8 @@ CMD:POWEROFF=0      power off immediately
 CMD:POWEROFF=8      ask first, 8 s confirmation window
 CMD:POWEROFF        ask first, using the device setting "NFC-Cmd PowOff"
 CMD:CPU=10          set the CPU to 10 MHz
+CMD:JOY             toggle the joystick ports (Normal <-> Swapped)
+CMD:JOY=SWAPPED     set the ports fixed; also NORMAL, WASD1, WASD2
 ```
 
 `parseCardCommand()` takes the text apart: check the prefix, split off an

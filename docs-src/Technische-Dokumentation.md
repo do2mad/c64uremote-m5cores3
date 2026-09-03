@@ -391,6 +391,26 @@ Der Pfad zum CPU-Speed-Item ist nicht fest, sondern wird gesucht: zuerst in
 verfügbaren Werte kommen aus dem `values`-Array des Items; als Rückfall dient
 eine feste Liste (`setFallbackCpuChoices`).
 
+## Joystick-Ports
+
+Fuer das Tauschen der Joystickports gibt es keinen `machine:`-Befehl. Die
+Belegung ist ein Konfigurationseintrag, im Test *Joystick Swapper* in der
+Kategorie *U64 Specific Settings* mit den Werten `Normal`, `Swapped`,
+`WASD Port 2` und `WASD Port 1`. Gesetzt wird sie deshalb ueber
+`/v1/configs/<Kategorie>/<Eintrag>?value=…`, genau wie die Taktstufe.
+
+`resolveJoyPath()` sucht wie beim Takt zuerst in *U64 Specific Settings* und geht
+sonst alle Kategorien durch, bis ein Eintragsname „Joystick" enthaelt; ein
+Umbenennen durch eine spaetere Firmware faellt damit nicht auf.
+`refreshJoyChoices()` liest `values` und `current`.
+
+`joyTokenFromValue()` und `joyValueFromToken()` rechnen zwischen Geraetewert und
+Kartenkuerzel um (`WASD Port 1` <-> `WASD1`), damit auf einer Karte kein
+Leerzeichen und keine firmwarespezifische Schreibweise stehen muss.
+`toggleJoystickSwap()` schaltet zwischen `Normal` und `Swapped` um und landet aus
+einem WASD-Modus wieder auf `Normal`; `cycleJoystickValue()` geht im Setup der
+Reihe nach durch alle gemeldeten Werte.
+
 ## Disk-Images und Autostart
 
 Beim Mounten wird das Ziellaufwerk ermittelt (`resolveTargetDrive`): bei „Auto"
@@ -523,6 +543,8 @@ CMD:POWEROFF=0      sofort ausschalten
 CMD:POWEROFF=8      nachfragen, 8 s Bestaetigungsfenster
 CMD:POWEROFF        nachfragen mit der Geraeteeinstellung "NFC-Cmd PowOff"
 CMD:CPU=10          CPU auf 10 MHz
+CMD:JOY             Joystickports umschalten (Normal <-> Swapped)
+CMD:JOY=SWAPPED     Ports fest setzen; auch NORMAL, WASD1, WASD2
 ```
 
 `parseCardCommand()` zerlegt den Text: Praefix pruefen, optionales Argument

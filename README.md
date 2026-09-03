@@ -150,7 +150,7 @@ Statusleiste, animiertes Logo und darunter **alle Kommandos als Kacheln**:
 
 ```
 RESET   REBOOT   MENU    POWER   CPU
-RFID    SD       STATUS  SETUP
+JOY     RFID     SD      STATUS  SETUP
 ```
 
 | Kachel | Wirkung |
@@ -160,6 +160,7 @@ RFID    SD       STATUS  SETUP
 | `MENU` | Ultimate-Menü öffnen/schließen (`machine:menu_button`) |
 | `POWER` | c64u ausschalten – **immer** mit Sicherheitsabfrage: innerhalb der *PowerOff Zeit* (Werk: 0,7 s) dieselbe Kachel ein zweites Mal antippen |
 | `CPU` | CPU-Geschwindigkeit lesen und setzen |
+| `JOY` | Joystickports im c64u tauschen – Config *U64 Specific Settings → Joystick Swapper*, ein Tipper schaltet zwischen *Normal* und *Swapped* um |
 | `RFID` | Karte auflegen → Pfad lesen → Programm starten |
 | `SD` | Datei auf SD wählen und direkt starten (ohne Karte) |
 | `STATUS` | Netzwerk-/Verbindungsdetails, Antippen löst einen Verbindungstest aus |
@@ -191,6 +192,7 @@ MiniJoyC, deshalb wandert diese Anzeige ins Display.)
 | LED Bright | 10 … 255 – Helligkeit der Lampe |
 | Disk Action | Mount / Mnt+Reset / Mnt+Run (Verhalten nach dem Mounten eines Images) |
 | Disk Drive | Auto (8) / A fest / B fest – Ziellaufwerk für Disk-Images |
+| Joystick | Portbelegung im c64u: Normal / Swapped, je nach Firmware auch WASD Port 1 / 2 |
 | Beep | Bestätigungston On / Off |
 | Factory Reset | Standardwerte |
 
@@ -332,6 +334,8 @@ CMD:RESET      CMD:REBOOT      CMD:MENU
 CMD:POWEROFF=0     sofort ausschalten
 CMD:POWEROFF=8     nachfragen, 8 s Zeit zum Bestätigen
 CMD:CPU=10         CPU auf 10 MHz
+CMD:JOY            Joystickports umschalten (Normal <-> Swapped)
+CMD:JOY=SWAPPED    Ports fest setzen; auch NORMAL, WASD1, WASD2
 ```
 
 Die Wartezeit steht also **auf der Karte**, `0` heißt ohne Nachfrage. Bestätigt
@@ -339,7 +343,8 @@ wird durch erneutes Auflegen derselben Karte (die UID muss passen) oder mit
 einem Tipper auf den Bildschirm; eine andere Karte oder ein abgelaufener
 Countdown brechen ab. Angelegt
 werden solche Karten über `SETUP → NFC-Cmd`; die Liste enthält neben den festen
-Befehlen alle CPU-Stufen, die dein c64u anbietet. Groß-/Kleinschreibung ist
+Befehlen die Joystick-Belegungen und alle CPU-Stufen, die dein c64u anbietet
+(rechts als *JOY* bzw. *CPU* gekennzeichnet). Groß-/Kleinschreibung ist
 egal, und es bleibt ein gewöhnlicher NDEF-Textrecord – jede NFC-App am Telefon
 kann so eine Karte lesen oder schreiben. Die M5Dial-Fassung versteht dasselbe
 Format.
