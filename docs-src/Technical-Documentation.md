@@ -349,6 +349,35 @@ The effect computation (`drawDistortedRows`, `drawRotoZoom`, `drawRipple`,
 every second line is computed and doubled on output (four times less compute).
 Menus are redrawn only on change (`screenDirty`, `barDirty`) so nothing flickers.
 
+## Battery indicator
+
+The level comes from M5Unified: `M5.Power.getBatteryLevel()` (0-100, negative =
+no battery), `M5.Power.isCharging()` and `M5.Power.getVBUSVoltage()`. It is read
+at most every `kBattPollMs` (5 s); blinking and swapping run on the remembered
+value and cost no further I2C traffic.
+
+The CoreS3 has an **AXP2101**. It provides a real percentage and measures the
+VBUS voltage, so the firmware also detects the cable being plugged in.
+
+Drawing happens in three places:
+
+* `drawBatteryLine()` replaces the line below the bar. The base line stays
+  `kColLine`, the filled part is two pixels tall. At 0 % it would be too narrow
+  to see, hence `if (width < 4) width = 4;`.
+* `drawBatterySymbol()` draws the frame (32 x 12 px) and the terminal and puts
+  the percentage in the middle. The frame is deliberately not filled - the line
+  does that, and the number stays readable.
+* `drawChargeBolt()` puts a 5 x 7 pixel bolt to the left of it, drawn row by row
+  from a small table instead of from triangles; at this size the shape would not
+  hold otherwise.
+
+The colour for all three comes from `batteryColor()`, the thresholds are
+`kBattGreen`, `kBattYellow` and `kBattBlinkAt` at the top of the file.
+
+`drawStatusBar()` used to run at most once per second - too rarely for visible
+blinking. On the lowest step `render()` therefore shortens the interval to
+`kBattBlinkMs` (500 ms).
+
 # ReST connection to the C64 Ultimate
 
 All commands go through the HTTP ReST API of the Ultimate firmware (from 3.11).

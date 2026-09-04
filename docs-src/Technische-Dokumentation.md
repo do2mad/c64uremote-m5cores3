@@ -358,6 +358,35 @@ Pixel und jede zweite Zeile gerechnet und beim Ausgeben verdoppelt (Faktor 4
 weniger Rechenlast). Menüs werden nur bei Änderung neu gezeichnet (`screenDirty`,
 `barDirty`), damit nichts flackert.
 
+## Akkuanzeige
+
+Der Ladestand kommt von M5Unified: `M5.Power.getBatteryLevel()` (0–100, negativ
+= kein Akku), `M5.Power.isCharging()` und `M5.Power.getVBUSVoltage()`. Gelesen
+wird höchstens alle `kBattPollMs` (5 s); Blinken und Wechsel laufen auf dem
+gemerkten Wert, kosten also keine weiteren I²C-Zugriffe.
+
+Im CoreS3 sitzt ein **AXP2101**. Er liefert einen echten Prozentwert und misst
+die VBUS-Spannung, deshalb erkennt die Firmware auch das blosse Anstecken.
+
+Gezeichnet wird an drei Stellen:
+
+* `drawBatteryLine()` ersetzt den Strich unter der Leiste. Die Grundlinie bleibt
+  `kColLine`, der gefüllte Teil ist zwei Pixel hoch. Bei 0 % wäre er zu schmal
+  zum Sehen, deshalb `if (width < 4) width = 4;`.
+* `drawBatterySymbol()` zeichnet Rahmen (32 × 12 px) und Pluspol und setzt die
+  Prozentzahl mittig hinein. Gefüllt wird der Rahmen bewusst nicht – das
+  erledigt der Strich, und die Zahl bleibt lesbar.
+* `drawChargeBolt()` setzt links davon einen 5 × 7 Pixel großen Blitz, Zeile für
+  Zeile aus einer kleinen Tabelle statt aus Dreiecken; bei dieser Größe stimmt
+  die Form sonst nicht.
+
+Die Farbe für alle drei liefert `batteryColor()`, die Schwellen stehen als
+`kBattGreen`, `kBattYellow` und `kBattBlinkAt` oben in der Datei.
+
+`drawStatusBar()` lief bisher höchstens einmal pro Sekunde – zu selten für ein
+sichtbares Blinken. In der untersten Stufe verkürzt `render()` das Intervall
+deshalb auf `kBattBlinkMs` (500 ms).
+
 # ReST-Anbindung an den C64 Ultimate
 
 Alle Kommandos laufen über die HTTP-ReST-API der Ultimate-Firmware (ab 3.11).

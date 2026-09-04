@@ -150,6 +150,33 @@ brightness (10 to 255; 60 is the factory setting and comfortable in most rooms).
 > like this sends nothing back. If none is plugged in, simply nothing happens.
 > You only need to switch it off if you want Port B for something else.
 
+# The battery indicator
+
+The CoreS3 has a built-in battery. How full it is can be seen in two places in the
+status bar.
+
+**The line below the status bar** doubles as the level gauge: the filled part is
+slightly thicker and coloured, the rest stays the dimmed line.
+
+**At the right-hand end** two displays take turns every 15 seconds – `RFID` and
+`SD` as before, and a battery symbol with the percentage inside.
+
+The colour means the same in both places:
+
+| Colour | Level |
+|---|---|
+| green | from 50 % |
+| yellow | from 20 % |
+| red | from 10 % |
+| red, blinking | below 10 % |
+| turquoise | on the charger |
+
+While the CoreS3 is on external power a small **bolt** sits in front of the
+battery symbol. It appears as soon as the cable is plugged in – the charge
+controller reports the USB voltage, so it stays on with a full battery too.
+
+The **status page** shows the level as a number as well.
+
 # Changing the CPU speed
 
 Tap the **CPU** tile. The current speed is shown at the top, the list of

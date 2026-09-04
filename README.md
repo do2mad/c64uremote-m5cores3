@@ -171,6 +171,17 @@ Statusleiste links: Punkt + Text zeigen den Gesamtzustand –
 fehlgeschlagen · **grün** alles OK. (Der CoreS3 hat keine RGB-LED wie der
 MiniJoyC, deshalb wandert diese Anzeige ins Display.)
 
+**Akkuanzeige** (seit v1.2.0): Der Strich unter der Statusleiste ist zugleich
+der Füllstandsbalken – der gefüllte Teil ist zwei Pixel hoch und farbig.
+Rechts außen wechseln sich alle 15 s (`kBarSwapMs`) `RFID`/`SD` und ein
+Akkusymbol mit der Prozentzahl ab; am Strom steht ein Blitz davor. Farben
+über `kBattGreen` / `kBattYellow` / `kBattBlinkAt`, am Ladekabel türkis und
+ohne Blinken. Der AXP2101 im CoreS3 liefert einen echten Prozentwert und misst die
+USB-Spannung – der Blitz steht deshalb schon da, sobald das Kabel steckt.
+
+Der Ladestand wird höchstens alle 5 s vom
+Lade-IC gelesen (`kBattPollMs`); auf der Status-Seite steht er als Zahl.
+
 ### Einstellungen
 
 | Punkt | Werte |

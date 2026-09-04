@@ -154,6 +154,33 @@ Räume angenehm).
 > so eine LED sendet nichts zurück. Steckt keine dran, passiert einfach nichts.
 > Abschalten musst du nur dann, wenn du Port B für etwas anderes brauchst.
 
+# Die Akkuanzeige
+
+Der CoreS3 hat einen eingebauten Akku. Wie voll er ist, siehst du in der
+Statusleiste an zwei Stellen.
+
+**Der Strich unter der Statusleiste** ist zugleich der Füllstandsbalken: der
+gefüllte Teil ist etwas dicker und farbig, der Rest bleibt die gedämpfte Linie.
+
+**Rechts außen** wechseln sich alle 15 Sekunden zwei Anzeigen ab – einmal
+`RFID` und `SD` wie gewohnt, einmal ein Akkusymbol mit der Prozentzahl darin.
+
+Die Farbe bedeutet an beiden Stellen dasselbe:
+
+| Farbe | Ladestand |
+|---|---|
+| grün | ab 50 % |
+| gelb | ab 20 % |
+| rot | ab 10 % |
+| rot, blinkend | unter 10 % |
+| türkis | am Ladekabel |
+
+Hängt der CoreS3 am Strom, steht ein kleiner **Blitz** vor dem Akkusymbol.
+Er erscheint, sobald das Kabel steckt – der Lade-IC meldet die USB-Spannung,
+also auch dann noch, wenn der Akku längst voll ist.
+
+Auf der **Status-Seite** steht der Ladestand zusätzlich als Zahl.
+
 # CPU-Geschwindigkeit ändern
 
 Kachel **CPU** antippen. Oben steht die aktuelle Geschwindigkeit, darunter die

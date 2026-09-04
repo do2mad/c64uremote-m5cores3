@@ -90,6 +90,17 @@ constexpr uint32_t kConnectionProbeMs  = 15000;
 constexpr uint32_t kWifiCardConnectMs  = 8000;
 constexpr uint32_t kFrameMs            = 33;     // ~30 fps
 constexpr uint32_t kStatusRefreshMs    = 1000;
+
+// ---- Akkuanzeige --------------------------------------------------------
+// Der Strich unter der Statusleiste ist zugleich der Fuellstandsbalken:
+// der gefuellte Teil ist zwei Pixel hoch und farbig, der Rest bleibt die
+// gedaempfte Linie. Am Ladekabel ist er tuerkis und blinkt nie.
+constexpr uint32_t kBattPollMs         = 5000;   // so oft wird der Stand gelesen
+constexpr uint32_t kBattBlinkMs        = 500;    // Halbperiode des Blinkens
+constexpr int      kBattGreen          = 50;     // ab hier gruen
+constexpr int      kBattYellow         = 20;     // ab hier gelb
+constexpr uint32_t kBarSwapMs          = 15000;  // Wechsel RFID/SD <-> Akku
+constexpr int      kBattBlinkAt        = 10;     // darunter rot und blinkend
 constexpr uint8_t  kPowerOffConfirmDefDs = 7;   // 0,7 s (Zehntelsekunden)
 constexpr uint32_t kRfidPollMs         = 250;
 
@@ -490,6 +501,11 @@ struct AppState {
   uint32_t lastWiFiAttemptMs     = 0;
   uint32_t lastConnectionProbeMs = 0;
   uint32_t lastStatusDrawMs      = 0;
+  int      batteryLevel          = -1;     // 0-100, negativ = kein Akku
+  bool     batteryCharging       = false;
+  int      vbusMilliVolt         = -1;     // -1 = Geraet meldet es nicht
+  bool     batteryPolled         = false;
+  uint32_t lastBatteryPollMs     = 0;
   uint32_t lastRfidPollMs        = 0;
 
   bool     pendingPowerOff   = false;      // Kachel: zweites B bestaetigt
@@ -4445,6 +4461,105 @@ void drawClipped(const String& text, int x, int y, int maxW, uint16_t color, Dat
 }
 
 // ---- Statusleiste -------------------------------------------------------
+// ---- Akku ---------------------------------------------------------------
+// Ladestand und Ladezustand kommen von M5Unified. Geraete ohne Akku liefern
+// einen negativen Wert - dann bleibt die Linie einfach wie bisher.
+void refreshBattery(uint32_t now) {
+  if (app.batteryPolled && now - app.lastBatteryPollMs < kBattPollMs) return;
+  app.batteryPolled     = true;
+  app.lastBatteryPollMs = now;
+  app.batteryLevel      = M5.Power.getBatteryLevel();
+  app.batteryCharging   = (M5.Power.isCharging() == m5::Power_Class::is_charging);
+  app.vbusMilliVolt     = M5.Power.getVBUSVoltage();
+}
+
+// Unterste Stufe erreicht? Am Ladekabel gilt das nie als Warnung.
+bool batteryLow() {
+  return app.batteryLevel >= 0 && !app.batteryCharging &&
+         app.batteryLevel < kBattBlinkAt;
+}
+
+// Dunkle Haelfte der Blinkphase.
+bool batteryDark(uint32_t now) {
+  return batteryLow() && ((now / kBattBlinkMs) % 2) == 1;
+}
+
+// Farbe zum aktuellen Ladestand. Am Ladekabel immer tuerkis.
+uint16_t batteryColor() {
+  if (app.batteryCharging)             return kColInfo;
+  if (app.batteryLevel >= kBattGreen)  return kColOk;
+  if (app.batteryLevel >= kBattYellow) return kColWarn;
+  return kColErr;
+}
+
+// Kurztext fuer die Statusseite.
+String batteryText() {
+  if (app.batteryLevel < 0) return "kein Akku";
+  String text(app.batteryLevel);
+  text += "%";
+  if (app.batteryCharging) text += " laedt";
+  return text;
+}
+
+// Der Strich unter der Statusleiste. Ganz leer waere der Balken unsichtbar,
+// deshalb bleibt ein kurzer Stummel stehen - sonst sieht man das Blinken nicht.
+void drawBatteryLine() {
+  const uint32_t now = millis();
+  refreshBattery(now);
+
+  gDraw->drawFastHLine(0, kBarH - 1, kScrW, kColLine);
+  if (app.batteryLevel < 0) return;
+  if (batteryDark(now))     return;
+
+  const uint16_t color = batteryColor();
+
+  int width = (kScrW * app.batteryLevel) / 100;
+  if (width < 4) width = 4;
+  gDraw->drawFastHLine(0, kBarH - 2, width, color);
+  gDraw->drawFastHLine(0, kBarH - 1, width, color);
+}
+
+// Zeigt der rechte Rand gerade den Akku statt RFID/SD? Ohne lesbaren
+// Ladestand bleibt es bei RFID/SD.
+bool batteryPhase(uint32_t now) {
+  return app.batteryLevel >= 0 && ((now / kBarSwapMs) % 2) == 1;
+}
+
+// Haengt das Geraet am Strom? Der AXP2101 im CoreS3 meldet die
+// VBUS-Spannung; der IP5306 im Core kann das nicht (-1), dort zaehlt nur
+// "laedt gerade" - bei vollem Akku am Kabel bleibt der Blitz deshalb weg.
+bool batteryOnPower() {
+  return app.batteryCharging || app.vbusMilliVolt > 4000;
+}
+
+// Kleiner Blitz links vom Akkusymbol. Zeile fuer Zeile gezeichnet, damit die
+// Form auch bei 5 x 7 Pixeln stimmt: zwei Schraegen mit Querbalken.
+void drawChargeBolt() {
+  constexpr int boltX = 264, boltY = 6;
+  static constexpr int8_t rows[7][2] = {{3,2},{2,2},{1,2},{0,5},{2,2},{1,2},{0,2}};
+  const uint16_t color = batteryColor();
+  for (int i = 0; i < 7; ++i) {
+    gDraw->drawFastHLine(boltX + rows[i][0], boltY + i, rows[i][1], color);
+  }
+}
+
+// Kleines Akkusymbol mit der Prozentzahl darin, 35 x 12 Pixel - genau der
+// Platz, den sonst "RFID" und "SD" belegen. Gefuellt wird es nicht: den
+// Fuellstand zeigt schon der Strich unter der Leiste, hier traegt die Farbe
+// die Aussage und die Zahl bleibt gut lesbar.
+void drawBatterySymbol() {
+  constexpr int bodyX = 272, bodyY = 4, bodyW = 32, bodyH = 12;
+  const uint16_t color = batteryColor();
+
+  gDraw->drawRect(bodyX, bodyY, bodyW, bodyH, color);
+  gDraw->fillRect(bodyX + bodyW, bodyY + 4, 3, 4, color);
+
+  String text(app.batteryLevel);
+  text += "%";
+  fontSmall();
+  drawClipped(text, bodyX + bodyW / 2, kBarH / 2, bodyW - 4, color, middle_center);
+}
+
 void drawStatusBar() {
   const bool wifiOk   = WiFi.status() == WL_CONNECTED;
   const bool targetOk = app.connection.targetReachable;
@@ -4457,7 +4572,7 @@ void drawStatusBar() {
   else if (wifiOk)             { stateColor = kColInfo; stateText = "NO C64U"; }
 
   gDraw->fillRect(0, 0, kScrW, kBarH, kColPanel);
-  gDraw->drawFastHLine(0, kBarH - 1, kScrW, kColLine);
+  drawBatteryLine();
 
   gDraw->fillCircle(10, kBarH / 2, 5, stateColor);
   fontSmall(); 
@@ -4470,10 +4585,20 @@ void drawStatusBar() {
   fontSmall(); 
   drawClipped(String("CPU ") + app.currentCpuValue, 176, kBarH / 2, 84, kColText, middle_left);
 
-  fontSmall(); 
-  drawClipped(app.rfidReady ? "RFID" : "-", 268, kBarH / 2, 26, app.rfidReady ? kColOk : kColLine, middle_left);
-  fontSmall(); 
-  drawClipped(app.sdReady ? "SD" : "-", 300, kBarH / 2, 20, app.sdReady ? kColOk : kColLine, middle_left);
+  // Rechts wechseln sich RFID/SD und das Akkusymbol ab. Blinkt der Akku,
+  // blinkt das Symbol mit.
+  const uint32_t nowMs = millis();
+  if (batteryPhase(nowMs)) {
+    if (!batteryDark(nowMs)) {
+      if (batteryOnPower()) drawChargeBolt();
+      drawBatterySymbol();
+    }
+  } else {
+    fontSmall(); 
+    drawClipped(app.rfidReady ? "RFID" : "-", 268, kBarH / 2, 26, app.rfidReady ? kColOk : kColLine, middle_left);
+    fontSmall(); 
+    drawClipped(app.sdReady ? "SD" : "-", 300, kBarH / 2, 20, app.sdReady ? kColOk : kColLine, middle_left);
+  }
 
   app.lastStatusDrawMs = millis();
   app.barDirty = false;
@@ -4778,7 +4903,8 @@ void drawStatusScreen() {
 
   const String hw = String("SD ") + (app.sdReady ? "ok" : "-") +
                     "   RFID " + (app.rfidReady ? "ok" : "-") +
-                    "   Heap " + String(ESP.getFreeHeap() / 1024) + "k";
+                    "   Heap " + String(ESP.getFreeHeap() / 1024) + "k" +
+                    "   Akku " + batteryText();
   fontSmall(); 
   drawClipped(hw, 16, kListY + 7 * 20 - 2, kScrW - 32, kColLabel, top_left);
   fontSmall();
@@ -5247,7 +5373,9 @@ void render(uint32_t now) {
   // damit auch mit Offscreen-Puffer wirksam.
   bool drawn = false;
 
-  if (app.barDirty || now - app.lastStatusDrawMs >= kStatusRefreshMs) {
+  // Blinkt der Akkubalken, muss die Leiste oefter neu gezeichnet werden.
+  const uint32_t barIntervalMs = batteryLow() ? kBattBlinkMs : kStatusRefreshMs;
+  if (app.barDirty || now - app.lastStatusDrawMs >= barIntervalMs) {
     drawStatusBar();
     drawn = true;
   }

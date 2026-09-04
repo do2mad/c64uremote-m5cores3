@@ -2,6 +2,49 @@
 
 C64uRemote für den **M5Stack CoreS3**. Neueste Version zuerst.
 
+## v1.2.0 – 2026-09-04
+
+### Deutsch
+
+**Neu: Akkuanzeige.** Der Ladestand ist jetzt auf einen Blick zu sehen, ohne
+dass die volle Statusleiste enger wird.
+
+- Der **Strich unter der Statusleiste** ist zugleich der Füllstandsbalken: der
+  gefüllte Teil ist etwas dicker und farbig, der Rest bleibt die gedämpfte Linie.
+- Rechts außen wechseln sich **`RFID`/`SD` und ein Akkusymbol mit der
+  Prozentzahl** alle 15 Sekunden ab.
+- Hängt das Gerät am Strom, steht ein **Ladeblitz** vor dem Symbol.
+- Farben: ab 50 % grün, ab 20 % gelb, ab 10 % rot, darunter rot und blinkend.
+  Am Ladekabel ist alles türkis und blinkt nie.
+- Auf der **Status-Seite** steht der Ladestand zusätzlich als Text.
+
+Der Ladestand wird höchstens alle fünf Sekunden vom Lade-IC gelesen; auf die
+Bildwiederholrate wirkt sich die Anzeige nicht aus.
+
+Firmware für M5Dial und M5StickC Plus2 ist seit v1.1.0 unverändert – die haben
+keinen passenden Akku beziehungsweise keine Statusleiste.
+
+### English
+
+**New: battery indicator.** The charge level is now visible at a glance without
+crowding the already full status bar.
+
+- The **line below the status bar** doubles as the level gauge: the filled part
+  is slightly thicker and coloured, the rest stays the dimmed line.
+- At the right-hand end **`RFID`/`SD` and a battery symbol with the percentage**
+  take turns every 15 seconds.
+- While the device is on external power a **charge bolt** sits in front of the
+  symbol.
+- Colours: green from 50 %, yellow from 20 %, red from 10 %, below that red and
+  blinking. On the charger everything is turquoise and never blinks.
+- The **status page** shows the level as text as well.
+
+The level is read from the charge controller at most every five seconds; the
+indicator has no effect on the frame rate.
+
+The firmware for the M5Dial and the M5StickC Plus2 is unchanged since v1.1.0 –
+those have no suitable battery, respectively no status bar.
+
 ## v1.1.0 – 2026-09-03
 
 ### Deutsch
