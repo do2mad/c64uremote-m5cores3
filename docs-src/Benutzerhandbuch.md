@@ -520,6 +520,13 @@ dauerhaft gespeichert und nach dem Aus- und Einschalten wieder geladen.
 
 # Häufige Fragen
 
+**Ab und zu steht *Not reached* oder *Not verified*, kurz darauf geht es wieder.**
+Der HTTP-Server im c64u weist gelegentlich eine Verbindung ab („connection
+refused"), obwohl Netz und Adresse in Ordnung sind – das passiert auch dann,
+wenn nur ein einziges Gerät im Netz hängt. Seit v1.2.1 wiederholt die Firmware
+einen abgewiesenen Aufruf nach kurzer Pause von selbst, du merkst davon also
+meist nichts mehr. Bleibt es dauerhaft dabei, hilft ein Neustart des c64u.
+
 **Der CoreS3 zeigt „NO WIFI".** Prüfe, ob WLAN-Name und Passwort korrekt
 hinterlegt sind und der Router in Reichweite ist. Der CoreS3 versucht die
 Verbindung alle paar Sekunden erneut.

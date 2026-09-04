@@ -404,6 +404,37 @@ Base URL: `http://<host>/v1/…`. If a network password is set, it is sent in th
 `sendApiRequest()` wraps GET/PUT over the `HTTPClient` (3 s timeout) and parses
 the JSON response with ArduinoJson (`errors` array).
 
+## Refused connections
+
+The HTTP server of the Ultimate firmware accepts only one connection at a time
+and refuses further ones with a TCP RST; `HTTPClient` reports this as *connection
+refused*. It was observed with only a single device on the network as well - so
+it happens sporadically and is neither a radio nor an address problem.
+
+The actual call therefore moved into `sendApiRequestOnce()`. `sendApiRequest()`
+is only a wrapper around it: if the transport fails (`httpCode <= 0`), a second
+attempt follows after `kApiRetryDelayMs` (250 ms). Retrying happens **only** on
+transport errors - nothing reached the c64u then, so a command cannot be doubled.
+HTTP error statuses (4xx, 5xx) are passed through unchanged, and the streaming
+upload in `uploadFile()` has its own path and stays untouched.
+
+On top of that `refreshConnectionStatus()` saves a request: without a stored
+password the second query would be byte-identical to the first, because the
+`X-Password` header is only set when there is one. That halves the base load on
+the c64u.
+
+## Reconnecting with several networks
+
+`beginWiFi()` moves on to the next stored profile after every attempt. Without a
+countermeasure that means: with two networks stored of which only one is
+reachable, every other reconnect after a dropout hits the dead one and costs a
+full retry cycle (`kWiFiRetryMs`, 10 s).
+
+`serviceWiFi()` therefore remembers the profile the connection came up on, via
+`wifiProfileIndex(WiFi.SSID())`, and makes it the next attempt; `gWifiNoted`
+keeps this to once per connection. After a dropout the first attempt goes back to
+the working network, and the dead one is only tried if the good one is really gone.
+
 ## CPU speed
 
 The path to the CPU-speed item is not fixed but discovered: first in "U64
