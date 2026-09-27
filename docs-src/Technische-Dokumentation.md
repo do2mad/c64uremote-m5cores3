@@ -175,6 +175,9 @@ Namensraum `c64unet`, getrennt von den Bedieneinstellungen in `c64uremote`:
 | `p0`…`p3` | Passwort |
 | `host` | Adresse des c64u |
 | `hpass` | Passwort des c64u |
+| `dmode` | Direktmodus an/aus |
+| `dssid`, `dpass` | SSID und Passwort des Direktnetzes |
+| `dnet` | Adressbereich des Direktnetzes, z. B. `192.168.4` |
 
 *Factory Reset* betrifft nur `c64uremote`; die Netzkonfiguration bleibt erhalten
 und wird ausschließlich über *WLAN → Alle löschen* verworfen.
@@ -243,6 +246,73 @@ oder `kPortalCloseMs` nach einem erfolgreichen Speichern. `stopPortal()` stellt
 
 Beide Klassen kommen aus dem Arduino-ESP32-Kern (`WebServer.h`, `DNSServer.h`);
 zusätzliche Bibliotheken sind nicht nötig.
+
+## Direktmodus
+
+Für Treffen ohne Router spannt der CoreS3 ein eigenes WLAN auf
+(`WIFI_AP`, ohne Station-Teil – aus demselben Grund wie beim Setup-Portal: eine
+suchende STA wechselt den Kanal und wirft angemeldete Geräte hinaus).
+
+| | |
+|---|---|
+| SSID / Passwort | `C64uRemote-Direct` / `c64ultimate` (Vorgaben, änderbar) |
+| Kanal, max. Clients | 6, 8 |
+| Adresse CoreS3 | `<netz>.1` |
+| DHCP-Bereich | `<netz>.64` … `<netz>.74` |
+| Ziel c64u | `<netz>.64` |
+| `<netz>` | `192.168.4` (Vorgabe) oder `192.168.2`, per `direct_net` beliebig |
+
+**Reihenfolge beim Start:** erst `WiFi.softAP()`, dann
+`WiFi.softAPConfig(ip, ip, 255.255.255.0, <netz>.64)`. Der vierte Parameter setzt
+den Anfang des DHCP-Bereichs (Arduino-Core 2.0.17 vergibt ab dort elf
+Adressen). Andersherum kann je nach Core-Version die Vorgabe `192.168.4.1`
+stehen bleiben – beim Setup-Portal fällt das nicht auf, weil es genau diese
+Adresse benutzt.
+
+**Zieladresse:** `targetHost()` liefert im Direktmodus `gDirectHost` statt der
+gespeicherten Heimadresse, die dadurch unangetastet bleibt. Ist das Gerät als
+normaler Client mit einem Netz verbunden, dessen SSID der des Direktnetzes
+entspricht, gilt ebenfalls `<netz>.64` – so kann ein zweiter Fernbediener
+mitlaufen, ohne dass seine Einstellungen geändert werden.
+
+**c64u finden:** Die erste DHCP-Vergabe ist `.64`. War ein anderes Gerät
+schneller, sucht `directNextCandidate()` weiter: Kandidaten sind `.64` und alle
+Adressen aus `esp_wifi_ap_get_sta_list()` + `esp_netif_get_sta_list()`. Nach
+jedem gescheiterten Statustest wird der nächste versucht. Als c64u gilt, wer
+auf `/v1/version` mit JSON antwortet (oder mit 401/403, wenn ein Passwort
+fehlt). Hat eine Adresse schon einmal geantwortet, wird erst nach dem zweiten
+Fehlschlag in Folge gewechselt – der c64u weist gelegentlich von sich aus ab
+(siehe *Abgewiesene Verbindungen*).
+
+**Statustest:** Ist niemand angemeldet, entfällt der Test ganz. Kommt ein Gerät
+hinzu (`WiFi.softAPgetStationNum()` steigt) und ist der c64u noch nicht
+bestätigt, wird sofort geprüft, wieder beginnend bei `.64`. Weil der c64u
+dann oft noch mit DHCP beschäftigt ist, folgen bis zu sechs Nachprüfungen im
+Abstand von 3 s (`directRecheckDue()`), auf jeder Seite, bis er antwortet. Im
+Direktnetz gilt für den Verbindungsaufbau außerdem eine Frist von 1 s.
+
+**DHCP zurücksetzen:** Der DHCP-Server des ESP32 vergibt Adressen über einen
+Zeiger, der nur vorwärts läuft. Gibt der c64u beim Abmelden seine Adresse frei
+oder fragt er beim Wiederkommen nach der alten, verliert der Server den Eintrag
+und vergibt die nächste (`.65`, `.66` …). Deshalb startet `directRestartDhcp()`
+den Server neu, sobald sich das letzte Gerät abgemeldet hat – danach beginnt er
+wieder bei `.64`. Mit weiteren angemeldeten Geräten unterbleibt das, weil der
+Server dabei alle Zuteilungen vergisst und sonst eine Adresse doppelt vergeben
+könnte; dann findet die Suche den c64u unter seiner neuen Adresse.
+
+**Umschalten:** `setDirectMode()` speichert, verwirft den Verbindungsstatus und
+startet AP bzw. WLAN neu. Ein gezielt gewähltes Netz (Liste, Suche,
+WLAN-Karte) beendet den Direktmodus. Das Setup-Portal verdrängt den Direkt-AP
+vorübergehend; nach dem Portal startet `beginWiFi()` ihn wieder.
+
+**Suche im Direktmodus:** Scannen kann nur der Station-Teil. Für die Dauer
+der Suche wird deshalb kurz auf `WIFI_AP_STA` und danach zurück auf `WIFI_AP`
+geschaltet.
+
+NVS (Namensraum `c64unet`): `dmode` (bool), `dssid`, `dpass`, `dnet`.
+Unbrauchbare Werte (SSID leer oder > 32 Zeichen, Passwort < 8 oder > 63,
+Adressbereich nicht drei Zahlen 0…255) werden beim Laden durch die Vorgaben
+ersetzt.
 
 # Statuslampe
 
@@ -410,7 +480,7 @@ Header `X-Password` mitgesendet.
 - **Disk einlegen** — `POST /v1/drives/<a|b>:mount?type=…&mode=…`
 - **Laufwerk an** — `PUT /v1/drives/<a|b>:on`
 
-`sendApiRequest()` kapselt GET/PUT über den `HTTPClient` (Timeout 3 s) und wertet
+`sendApiRequest()` kapselt GET/PUT über einen eigenen HTTP-Weg (siehe unten) und wertet
 die JSON-Antwort mit ArduinoJson aus (`errors`-Array).
 
 ## Abgewiesene Verbindungen
@@ -420,18 +490,59 @@ weist weitere mit einem TCP-RST ab; `HTTPClient` meldet das als *connection
 refused*. Beobachtet wurde das auch ohne ein zweites Gerät im Netz – es tritt
 also sporadisch auf und ist kein Funk- oder Adressproblem.
 
-Der eigentliche Aufruf ist deshalb nach `sendApiRequestOnce()` gewandert.
-`sendApiRequest()` ist nur noch ein Mantel darum: schlägt der Transport fehl
-(`httpCode <= 0`), folgt nach `kApiRetryDelayMs` (250 ms) ein zweiter Versuch.
-Wiederholt wird **ausschließlich** bei Transportfehlern – dann ist beim c64u
-nichts angekommen und ein Befehl kann sich nicht doppeln. HTTP-Fehlerstatus
-(4xx, 5xx) werden unverändert durchgereicht, und der Streaming-Upload in
-`uploadFile()` hat seinen eigenen Weg und bleibt unberührt.
+Der eigentliche Aufruf steckt in `sendApiRequestOnce()`. `sendApiRequest()` ist
+ein Mantel darum: Kommt keine Verbindung zustande
+(`HTTPC_ERROR_CONNECTION_REFUSED`), folgen nach `kApiRetryDelayMs` bis zu zwei
+weitere Versuche (`kApiConnectAttempts` = 3). Wiederholt wird **ausschließlich**
+in diesem Fall – dann ist beim c64u nichts angekommen und ein Befehl kann sich
+nicht doppeln. Lesefehler und HTTP-Fehlerstatus (4xx, 5xx) werden unverändert
+durchgereicht.
 
 Zusätzlich spart `refreshConnectionStatus()` eine Anfrage: Ohne hinterlegtes
 Passwort wäre die zweite Abfrage byte-gleich mit der ersten, weil der Header
 `X-Password` nur gesetzt wird, wenn überhaupt eines da ist. Das halbiert die
 Grundlast auf dem c64u.
+
+## Eigener HTTP-Weg (seit v1.4.0)
+
+Alle Anfragen an den c64u – `sendApiRequestOnce()`, `readC64Byte()` und die Uploads in `uploadFile()` – laufen nicht mehr über
+`HTTPClient`/`WiFiClient`, sondern über kleine Funktionen auf lwIP-Sockets:
+
+* `rawOpen()` baut die Verbindung nicht blockierend auf und schaut per
+  `select()` ohne Wartezeit alle 2 ms nach; Frist `kHttpConnectTimeoutMs`
+  (1,5 s), im Direktmodus `kHttpConnectDirectMs` (1 s).
+* `rawSendAll()` schickt Anfrage bzw. Datei in Stücken mit `MSG_DONTWAIT`.
+* `rawReadResponse()` liest die Antwort, bis der c64u die Verbindung schließt
+  (oder kurz nach dem letzten per `Content-Length` angekündigten Byte), und
+  wertet Statuszeile, `Content-Length` und `chunked` aus. Schließt der c64u ohne
+  Antwort, lautet der Fehler *connection lost*, bleibt die Antwort aus,
+  *read Timeout*.
+
+`rawHttpRequest()` fasst das für GET/PUT zusammen; jede Anfrage trägt
+`Connection: close`. Hintergrund: Mit `HTTPClient` gingen im Heimnetz zeitweise
+die meisten Abfragen verloren, während eine ohne Warten abgefragte Verbindung
+zuverlässig durchkam.
+
+`staSsid()` und `staRssi()` liefern Netzname und Signalstärke aus einem
+Zwischenspeicher, der höchstens einmal pro Sekunde über
+`esp_wifi_sta_get_ap_info()` erneuert wird. `WiFi.SSID()` fragt bei jedem Aufruf
+den Treiber, und `targetHost()` braucht den Netznamen ständig (Erkennung des
+Direktnetzes als Client). `directStationCount()` erfragt die Zahl der Stationen
+im Direktmodus höchstens alle 500 ms.
+
+### NFC-Funkfeld
+
+Der MFRC522-Treiber lässt das 13,56-MHz-Feld nach `PCD_Init()` dauerhaft an.
+`rfidFieldOn()` und `rfidFieldOff()` schalten es nur für die Kartenprobe
+(`cardPresent()`, `cardPresentQuick()`, danach 5 ms Anlaufzeit für die Karte)
+und für die Bearbeitung einer erkannten Karte ein; bei einer leeren Probe geht
+es wieder aus. Nach `processCard()` bleibt es dagegen an, bis die Karte weg ist
+(`rfidHoldCard()`, `rfidHeldCardGone()`): Die bearbeitete Karte ist per HLTA
+schlafen gelegt und meldet sich auf REQA nicht mehr; ob sie noch aufliegt, prüft
+WUPA. Würde das Feld aus- und wieder eingeschaltet, wachte die Karte frisch auf
+und würde erneut ausgeführt bzw. beschrieben. Beim M5Dial, dessen NFC-Antenne direkt neben
+der WLAN-Antenne liegt, störte das dauerhaft eingeschaltete Feld den
+WLAN-Empfang; hier spart das Abschalten vor allem Strom.
 
 ## Wiederverbinden mit mehreren Netzen
 
@@ -441,7 +552,7 @@ ist erreichbar, trifft es nach einem Aussetzer jedes zweite Mal das tote Netz
 und kostet einen kompletten Wiederholungstakt (`kWiFiRetryMs`, 10 s).
 
 `serviceWiFi()` merkt sich deshalb beim Verbinden über
-`wifiProfileIndex(WiFi.SSID())` das Profil, mit dem es geklappt hat, und legt es
+`wifiProfileIndex(staSsid())` das Profil, mit dem es geklappt hat, und legt es
 als nächsten Versuch fest; `gWifiNoted` sorgt dafür, dass das nur einmal je
 Verbindung passiert. Nach einem Aussetzer geht der erste Versuch damit wieder an
 das funktionierende Netz, das tote kommt nur dran, wenn das gute wirklich weg ist.
@@ -604,6 +715,7 @@ CMD:MENU
 CMD:POWEROFF=0      sofort ausschalten
 CMD:POWEROFF=8      nachfragen, 8 s Bestaetigungsfenster
 CMD:POWEROFF        nachfragen mit der Geraeteeinstellung "NFC-Cmd PowOff"
+CMD:M5OFF           den CoreS3 selbst ausschalten (auch CMD:DIALOFF)
 CMD:CPU=10          CPU auf 10 MHz
 CMD:JOY             Joystickports umschalten (Normal <-> Swapped)
 CMD:JOY=SWAPPED     Ports fest setzen; auch NORMAL, WASD1, WASD2

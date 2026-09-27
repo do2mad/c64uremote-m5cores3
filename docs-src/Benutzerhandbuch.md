@@ -307,6 +307,17 @@ Countdown. Zum Ausschalten:
 Läuft der Countdown ab oder kommt eine andere Karte, passiert nichts. Eine Karte
 mit der Zeit **0** schaltet ohne Nachfrage sofort aus.
 
+
+## CoreS3 per Karte ausschalten
+
+Eine Karte mit `CMD:M5OFF` schaltet den **CoreS3 selbst** aus – ohne Nachfrage,
+weil das Auflegen schon eine bewusste Handlung ist. Am Akku geht er ganz aus;
+hängt USB dran, schläft er nur tief und startet mit der Einschalt- bzw.
+Reset-Taste neu. Damit eine Karte, die beim Einschalten noch aufliegt, das Gerät
+nicht gleich wieder abschaltet, wird sie in den ersten acht Sekunden nach dem
+Start ignoriert (*KARTE ABNEHMEN*). Dieselbe Karte schaltet auch einen M5Dial
+aus.
+
 ## Was auf der Karte steht
 
 Der Befehl ist gewöhnlicher Text in einem NDEF-Record – du kannst ihn mit jeder
@@ -318,9 +329,12 @@ CMD:REBOOT
 CMD:MENU
 CMD:POWEROFF=0      sofort ausschalten
 CMD:POWEROFF=8      nachfragen, 8 Sekunden Zeit
+CMD:M5OFF           den CoreS3 selbst ausschalten
 CMD:CPU=10          CPU auf 10 MHz
 CMD:JOY             Joystickports umschalten
 CMD:JOY=SWAPPED     Ports fest setzen; auch NORMAL, WASD1, WASD2
+CMD:DIRECT=192.168.4  Direktmodus mit diesem Netz einschalten
+CMD:DIRECT=OFF      Direktmodus aus, zurück ins gespeicherte WLAN
 ```
 
 Groß- und Kleinschreibung sind egal. Dasselbe Format verstehen die M5Dial- und
@@ -391,6 +405,8 @@ Zuhause und einem Handy-Hotspot wechselst.
 
 | Eintrag | Wirkung |
 |---|---|
+| **Direktmodus** | Eigenes WLAN ohne Router, der c64u meldet sich direkt an (siehe Kapitel *Direktmodus*) |
+| **Direkt-Netz** | Adressbereich des Direktnetzes: `192.168.4.x` oder `192.168.2.x` |
 | **Netz suchen** | Umgebung durchsuchen und ein Netz aus der Liste wählen |
 | **Von SD laden** | `wifi.txt` von der microSD einlesen |
 | **Setup-Portal** | Eigener Accesspoint mit Weboberfläche |
@@ -468,6 +484,93 @@ gefundenen Netze oder von Hand – und optional Adresse und Passwort des C64.
 Nach dem Speichern schaltet der CoreS3 den Accesspoint ab und verbindet sich mit
 dem neuen Netz. Dass die Browserverbindung dabei abbricht, ist normal.
 
+# Direktmodus: ohne Router, z. B. auf Treffen
+
+Auf einem Treffen gibt es oft kein WLAN – oder eines, in das man den c64u
+nicht hängen will. Für diesen Fall spannt der CoreS3 selbst ein kleines WLAN
+auf, und der c64u meldet sich direkt bei ihm an. Ein Router ist nicht nötig.
+
+| | |
+|---|---|
+| **Netzname (SSID)** | `C64uRemote-Direct` |
+| **Passwort** | `c64ultimate` |
+| **CoreS3** | `192.168.4.1` |
+| **c64u** | `192.168.4.64` |
+
+## Einmal am c64u
+
+Der c64u kann sich nur **ein** WLAN merken. Trage dort im Ultimate-Menü unter
+den Netzwerk-/WLAN-Einstellungen Netzname und Passwort des Direktnetzes ein
+und lass die Adressvergabe auf **DHCP** stehen. Zurück zu Hause trägst du am
+c64u wieder dein Heimnetz ein.
+
+## Am CoreS3
+
+Unter **Setup → WLAN** *Direktmodus* antippen. Der CoreS3 schaltet sein normales WLAN ab,
+startet das Direktnetz und zeigt eine Seite mit allem, was der c64u braucht:
+Netzname, Passwort, die Adresse des c64u und den Stand der Verbindung
+(*warte auf den c64u*, *c64u verbunden*).
+
+Sobald sich der c64u anmeldet, bekommt er die Adresse `192.168.4.64` und der
+CoreS3 prüft sofort, ob er antwortet. Danach funktioniert alles wie gewohnt.
+Die eingestellte Heimadresse des c64u bleibt dabei unangetastet.
+
+Meldet sich zuerst ein anderes Gerät an (etwa ein Handy), bekommt es die
+`.64` und der c64u die nächste Adresse. Das ist kein Problem: Der CoreS3 probiert
+dann die angemeldeten Geräte der Reihe nach durch, bis sich der c64u meldet.
+Die gefundene Adresse steht auf der Direktmodus-Seite und in der Statusanzeige.
+
+Der Direktmodus bleibt auch nach dem Ausschalten eingestellt – der CoreS3 startet
+dann gleich wieder mit dem Direktnetz.
+
+**Ausschalten:** Im WLAN-Menü den Eintrag *Direktmodus* noch einmal antippen. Ein Tipper auf die Direktmodus-Seite führt nur zurück ins WLAN-Menü – so wirft eine versehentliche Berührung den c64u nicht aus dem Netz. Der CoreS3 verbindet sich danach wieder mit dem
+gespeicherten WLAN. Das passiert auch, wenn du unter *Gespeichert* ein Netz
+wählst oder eine WLAN-Karte auflegst.
+
+## Adressbereich
+
+*Direkt-Netz* schaltet zwischen `192.168.4.x` und `192.168.2.x` um. Der
+CoreS3 hat immer die `.1`, der c64u die `.64`. Läuft der Direktmodus gerade,
+startet das Netz sofort neu; der c64u meldet sich von selbst wieder an.
+
+Für andere Werte gibt es in der `wifi.txt` auf der SD-Karte eigene Zeilen:
+
+```
+direct      = an                  an / aus
+direct_ssid = C64uRemote-Direct
+direct_pass = c64ultimate         mindestens acht Zeichen
+direct_net  = 192.168.4           CoreS3 = .1, c64u = .64
+```
+
+*Auf SD sichern* schreibt diese Zeilen mit heraus.
+
+## Per Karte ein- und ausschalten
+
+Unter *NFC-Cmd* stehen drei Befehlskarten für den Direktmodus: zuerst das
+gerade eingestellte Netz, dann das andere (`192.168.4.x` bzw. `192.168.2.x`),
+zuletzt *Direktmodus aus*. Auf der Karte steht dann `CMD:DIRECT=192.168.4`,
+`CMD:DIRECT=192.168.2` oder `CMD:DIRECT=OFF`. Auflegen schaltet sofort um;
+läuft der Direktmodus schon mit diesem Netz, passiert nichts – die Karte darf
+also liegen bleiben.
+
+## Weitere Geräte im Direktnetz
+
+- **Ein Handy oder Notebook** kann sich ebenfalls ins Direktnetz einbuchen. Die
+  Weboberfläche des c64u erreichst du dann unter `http://192.168.4.64`.
+- **Ein zweiter M5-Fernbediener** meldet sich wie in jedes andere WLAN an, am
+  einfachsten mit einer WLAN-Karte
+  `WIFI:S:C64uRemote-Direct;T:WPA;P:c64ultimate;;`. Erkennt er das Direktnetz,
+  spricht er den c64u automatisch unter der `.64` an – seine Heimadresse bleibt
+  gespeichert. Den Direktmodus schaltet immer nur **ein** Gerät ein.
+
+## Gut zu wissen
+
+- Das Direktnetz braucht etwas mehr Strom als der normale WLAN-Betrieb, weil der
+  Funk dauerhaft an sein muss.
+- Für einen Tisch reicht die Reichweite gut, quer durch einen Saal eher nicht.
+- *Netz suchen* funktioniert auch im Direktmodus. Während der Suche kann der
+  c64u kurz den Kontakt verlieren; er meldet sich danach von selbst wieder an.
+
 # Einstellungen im Überblick
 
 Im **Setup** findest du nach den NFC-Aktionen alle Einstellungen. Sie werden
@@ -526,6 +629,15 @@ refused"), obwohl Netz und Adresse in Ordnung sind – das passiert auch dann,
 wenn nur ein einziges Gerät im Netz hängt. Seit v1.2.1 wiederholt die Firmware
 einen abgewiesenen Aufruf nach kurzer Pause von selbst, du merkst davon also
 meist nichts mehr. Bleibt es dauerhaft dabei, hilft ein Neustart des c64u.
+
+**Der c64u fällt immer wieder aus, obwohl der CoreS3 guten Empfang hat.**
+Seit v1.4.0 sollte das nicht mehr vorkommen: Die Verbindung zum c64u wurde
+gründlich überarbeitet (siehe CHANGELOG), und der c64u läuft per WLAN genauso
+zuverlässig wie per LAN-Kabel. Für Treffen ohne Router ist der Direktmodus da; dort hängt
+der c64u direkt am CoreS3.
+Ist der c64u nach vielen Netzwechseln gar nicht mehr zu erreichen, obwohl sein
+Menü eine Verbindung zeigt: kurz vom Strom trennen. Aus- und Einschalten per
+Taste hat in diesem Fall nicht gereicht.
 
 **Der CoreS3 zeigt „NO WIFI".** Prüfe, ob WLAN-Name und Passwort korrekt
 hinterlegt sind und der Router in Reichweite ist. Der CoreS3 versucht die

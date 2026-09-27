@@ -2,6 +2,94 @@
 
 C64uRemote für den **M5Stack CoreS3**. Neueste Version zuerst.
 
+## v1.4.0 – 2026-09-27
+
+### Deutsch
+
+**Neu: Direktmodus – ohne Router, z. B. auf Treffen.** Der CoreS3 spannt auf Wunsch
+selbst ein WLAN auf, und der c64u meldet sich direkt bei ihm an.
+
+- Neue Einträge im WLAN-Menü: **Direktmodus** (an/aus) und **Direkt-Netz**
+  (`192.168.4.x` oder `192.168.2.x`).
+- Netz `C64uRemote-Direct`, Passwort `c64ultimate`. Der CoreS3 hat die `.1`, der
+  c64u bekommt per DHCP die `.64`. Eine eigene Seite zeigt, was am c64u
+  einzutragen ist, und ob er schon verbunden ist.
+- Meldet sich zuerst ein anderes Gerät an, sucht der CoreS3 unter den angemeldeten
+  Geräten weiter, bis der c64u antwortet.
+- Ein zweiter Fernbediener kann sich als normaler Client ins Direktnetz
+  einbuchen und spricht den c64u dann automatisch unter der `.64` an; seine
+  Heimadresse bleibt erhalten.
+- Wer ein gespeichertes Netz wählt oder eine WLAN-Karte auflegt, beendet den
+  Direktmodus.
+- Befehlskarten `CMD:DIRECT=192.168.4`, `CMD:DIRECT=192.168.2` und
+  `CMD:DIRECT=OFF`, anzulegen unter *NFC-Cmd*.
+- Die `wifi.txt` kennt dafür die Zeilen `direct`, `direct_ssid`, `direct_pass`
+  und `direct_net`; *Auf SD sichern* schreibt sie mit heraus.
+
+**Neu: CoreS3 per Karte ausschalten.** Eine Befehlskarte `CMD:M5OFF` schaltet den
+CoreS3 selbst aus (am Akku ganz, an USB in den Tiefschlaf) – dieselbe Karte wie beim
+M5Dial. Anzulegen unter *NFC-Cmd*. In den ersten acht Sekunden nach dem Start
+wird sie ignoriert.
+
+**Verbindung zum c64u zuverlässiger.**
+
+- Anfragen an den c64u (Abfragen, Befehle, Uploads) laufen über einen eigenen,
+  schlanken HTTP-Weg: Verbindungsaufbau ohne blockierendes Warten, die Antwort
+  wird vollständig gelesen; bis zu drei Verbindungsversuche mit je 1,5 s.
+- Netzname und Signalstärke werden höchstens einmal pro Sekunde beim
+  WLAN-Treiber abgefragt statt tausendfach.
+- Das Funkfeld des NFC-Lesers ist nur noch für die kurze Kartenprobe und
+  während der Kartenbearbeitung an. Beim M5Dial hatte das dauerhaft
+  eingeschaltete Feld den WLAN-Empfang gestört; hier spart es vor allem Strom.
+
+**Versionsanzeige.** Die Statusseite zeigt jetzt die Firmware-Version im Titel
+(`STATUS v1.4.0`), das Startprotokoll auf der seriellen Schnittstelle ebenfalls.
+
+Die Nummer springt von 1.2.1 direkt auf 1.4.0: 1.3.x gab es nur für den M5Dial,
+ab jetzt tragen wieder alle vier Geräte denselben Stand.
+
+### English
+
+**New: direct mode – no router, e.g. at meetings.** On request the CoreS3 opens a
+WiFi network of its own and the c64u connects to it directly.
+
+- New entries in the WiFi menu: **Direct mode** (on/off) and **Direct net**
+  (`192.168.4.x` or `192.168.2.x`).
+- Network `C64uRemote-Direct`, password `c64ultimate`. The CoreS3 has `.1`, the
+  c64u gets `.64` via DHCP. A page of its own shows what to enter on the c64u
+  and whether it is connected yet.
+- If another device joins first, the CoreS3 keeps looking among the connected
+  devices until the c64u answers.
+- A second remote can join the direct network as a normal client and then
+  addresses the c64u at `.64` automatically; its home address is kept.
+- Choosing a stored network or presenting a WiFi card ends direct mode.
+- Command cards `CMD:DIRECT=192.168.4`, `CMD:DIRECT=192.168.2` and
+  `CMD:DIRECT=OFF`, created under *NFC-Cmd*.
+- `wifi.txt` has the lines `direct`, `direct_ssid`, `direct_pass` and
+  `direct_net` for this; *Save to SD* writes them out as well.
+
+**New: switch the CoreS3 off by card.** A command card `CMD:M5OFF` switches the
+CoreS3 itself off (completely on battery, deep sleep on USB) – the same card as on
+the M5Dial. Created under *NFC-Cmd*. It is ignored during the first eight
+seconds after start.
+
+**Connection to the c64u more reliable.**
+
+- Requests to the c64u (queries, commands, uploads) go through an own, lean
+  HTTP path: connecting without blocking waits, the reply is read completely;
+  up to three connection attempts of 1.5 s each.
+- Network name and signal strength are queried from the WiFi driver at most
+  once per second instead of thousands of times.
+- The NFC reader's RF field is now only on for the short card probe and while
+  a card is being processed. On the M5Dial the permanently switched-on field
+  disturbed WiFi reception; here it mainly saves power.
+
+**Version display.** The status page now shows the firmware version in its title
+(`STATUS v1.4.0`), and so does the boot log on the serial port.
+
+The number jumps from 1.2.1 straight to 1.4.0: 1.3.x only existed for the M5Dial;
+from now on all four devices carry the same version again.
+
 ## v1.2.1 – 2026-09-04
 
 ### Deutsch

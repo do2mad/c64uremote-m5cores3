@@ -344,6 +344,8 @@ ausgeführt wird – ohne Menü und ohne SD-Karte:
 CMD:RESET      CMD:REBOOT      CMD:MENU
 CMD:POWEROFF=0     sofort ausschalten
 CMD:POWEROFF=8     nachfragen, 8 s Zeit zum Bestätigen
+CMD:M5OFF          den CoreS3 selbst ausschalten
+CMD:DIRECT=192.168.4  Direktmodus ein; CMD:DIRECT=OFF aus
 CMD:CPU=10         CPU auf 10 MHz
 CMD:JOY            Joystickports umschalten (Normal <-> Swapped)
 CMD:JOY=SWAPPED    Ports fest setzen; auch NORMAL, WASD1, WASD2
@@ -584,6 +586,15 @@ suchen, dabei den Kanal wechseln und angemeldete Handys abwerfen.
 Die Zugangsdaten liegen im NVS-Namensraum `c64unet`, getrennt von den
 Bedieneinstellungen in `c64uremote`. *Factory Reset* lässt sie deshalb
 unangetastet; verworfen werden sie nur über *WLAN → Alle löschen*.
+
+### Direktmodus (ohne Router)
+
+Für Treffen ohne WLAN: **Setup → WLAN → Direktmodus**. Der CoreS3 spannt dann selbst
+das Netz `C64uRemote-Direct` (Passwort `c64ultimate`) auf und hat die Adresse
+`192.168.4.1`; der c64u bekommt per DHCP die `192.168.4.64`. Am c64u wird das
+Netz einmal eingetragen – er kann sich nur eines merken. *Direkt-Netz* schaltet
+auf `192.168.2.x` um. In der `wifi.txt` heißen die Zeilen `direct`, `direct_ssid`,
+`direct_pass` und `direct_net`. Einzelheiten stehen im Benutzerhandbuch, Kapitel *Direktmodus*.
 
 ---
 

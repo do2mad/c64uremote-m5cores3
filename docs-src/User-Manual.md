@@ -301,6 +301,17 @@ off:
 If the countdown expires or a different card appears, nothing happens. A card
 with a time of **0** powers off immediately without asking.
 
+
+## Switching the CoreS3 off by card
+
+A card holding `CMD:M5OFF` switches the **CoreS3 itself** off – without a
+prompt, because presenting the card is already a deliberate act. On battery it
+goes off completely; with USB attached it only goes into deep sleep and starts
+again with the power or reset button. So that a card still lying on the reader
+at power-up does not switch the device off again right away, it is ignored for
+the first eight seconds after start (*REMOVE CARD*). The same card also switches
+an M5Dial off.
+
 ## What is stored on the card
 
 The command is plain text in an NDEF record – you can inspect or write it with
@@ -312,9 +323,12 @@ CMD:REBOOT
 CMD:MENU
 CMD:POWEROFF=0      power off immediately
 CMD:POWEROFF=8      ask first, 8 seconds to confirm
+CMD:M5OFF           switch the CoreS3 itself off
 CMD:CPU=10          set the CPU to 10 MHz
 CMD:JOY             toggle the joystick ports
 CMD:JOY=SWAPPED     set the ports fixed; also NORMAL, WASD1, WASD2
+CMD:DIRECT=192.168.4  switch direct mode on with this network
+CMD:DIRECT=OFF      direct mode off, back to the stored WiFi
 ```
 
 Case does not matter. The M5Dial and M5Stack Core editions understand the same
@@ -385,6 +399,8 @@ and a phone hotspot.
 
 | Entry | Effect |
 |---|---|
+| **Direct mode** | Own WiFi without a router, the c64u connects directly (see chapter *Direct mode*) |
+| **Direct net** | Address range of the direct network: `192.168.4.x` or `192.168.2.x` |
 | **Scan networks** | Search the area and pick a network from the list |
 | **Load from SD** | Read `wifi.txt` from the microSD |
 | **Setup portal** | Access point of its own with a web interface |
@@ -461,6 +477,91 @@ found or by hand – and optionally the address and password of the C64.
 After saving, the CoreS3 shuts the access point down and connects to the new
 network. The browser connection breaking off in the process is normal.
 
+# Direct mode: no router, e.g. at meetings
+
+At a meeting there is often no WiFi – or one you would rather not put the
+c64u on. For this case the CoreS3 opens a small WiFi network of its own and the
+c64u connects to it directly. No router is needed.
+
+| | |
+|---|---|
+| **Network name (SSID)** | `C64uRemote-Direct` |
+| **Password** | `c64ultimate` |
+| **CoreS3** | `192.168.4.1` |
+| **c64u** | `192.168.4.64` |
+
+## Once on the c64u
+
+The c64u can only remember **one** WiFi network. In the Ultimate menu, enter
+the direct network's name and password in the network/WiFi settings and leave
+address assignment on **DHCP**. Back home, enter your home network on the c64u
+again.
+
+## On the CoreS3
+
+Under **Setup → WiFi**, tap *Direct mode*. The CoreS3 leaves its normal WiFi,
+starts the direct network and shows a page with everything the c64u needs:
+network name, password, the c64u's address and the connection state
+(*waiting for the c64u*, *c64u connected*).
+
+As soon as the c64u joins, it gets the address `192.168.4.64` and the CoreS3
+checks right away whether it answers. After that everything works as usual.
+The c64u's stored home address is left untouched.
+
+If another device (a phone, say) joins first, it gets `.64` and the c64u the
+next address. That is not a problem: the CoreS3 then tries the connected devices
+one after another until the c64u answers. The address it found is shown on the
+direct mode page and in the status display.
+
+Direct mode stays set after switching off – the CoreS3 starts straight into the
+direct network next time.
+
+**Switching off:** Tap the *Direct mode* entry in the WiFi menu once more. A tap on the direct mode page only goes back to the WiFi menu – so an accidental touch does not throw the c64u off the network. The CoreS3 then reconnects to the stored WiFi.
+The same happens when you pick a network under *Saved* or present a WiFi card.
+
+## Address range
+
+*Direct net* switches between `192.168.4.x` and `192.168.2.x`. The CoreS3
+always has `.1`, the c64u `.64`. If direct mode is running, the network
+restarts right away; the c64u reconnects by itself.
+
+For other values, `wifi.txt` on the SD card has lines of its own:
+
+```
+direct      = on                  on / off
+direct_ssid = C64uRemote-Direct
+direct_pass = c64ultimate         at least eight characters
+direct_net  = 192.168.4           CoreS3 = .1, c64u = .64
+```
+
+*Save to SD* writes these lines out as well.
+
+## Switching by card
+
+*NFC-Cmd* offers three command cards for direct mode: first the network
+currently set, then the other one (`192.168.4.x` or `192.168.2.x`), last
+*Direct mode off*. The card then carries `CMD:DIRECT=192.168.4`,
+`CMD:DIRECT=192.168.2` or `CMD:DIRECT=OFF`. Presenting it switches right away;
+if direct mode is already running with that network, nothing happens – so the
+card may stay where it is.
+
+## More devices on the direct network
+
+- **A phone or notebook** can join the direct network as well. The c64u's web
+  interface is then at `http://192.168.4.64`.
+- **A second M5 remote** joins like any other WiFi, most easily with a WiFi
+  card `WIFI:S:C64uRemote-Direct;T:WPA;P:c64ultimate;;`. When it recognises
+  the direct network, it addresses the c64u at `.64` automatically – its home
+  address stays stored. Only **one** device switches direct mode on.
+
+## Good to know
+
+- The direct network draws a little more power than normal WiFi operation,
+  because the radio has to stay on all the time.
+- The range is fine for a table, less so across a hall.
+- *Scan networks* also works in direct mode. During the scan the c64u may
+  briefly lose contact; it reconnects by itself afterwards.
+
 # Settings overview
 
 In **Setup**, after the NFC actions, you find all settings. They are stored
@@ -519,6 +620,16 @@ refused") although network and address are fine – this happens even with only 
 single device on the network. Since v1.2.1 the firmware retries a refused call
 by itself after a short pause, so you will usually not notice. If it stays that
 way, restarting the c64u helps.
+
+**The c64u keeps dropping out although the CoreS3 has good reception.**
+Since v1.4.0 this should no longer happen: the connection to the c64u was
+reworked thoroughly (see CHANGELOG), and the c64u runs just as reliably on WiFi
+as on a LAN cable. For
+meetings without a router there is direct mode; there the c64u talks to the
+CoreS3 directly.
+If the c64u cannot be reached at all after many network changes although its
+menu shows a connection: unplug its power briefly. Switching it off and on with
+the button was not enough in that case.
 
 **The CoreS3 shows "NO WIFI".** Check that the Wi-Fi name and password are stored
 correctly and the router is in range. The CoreS3 retries the connection every few
