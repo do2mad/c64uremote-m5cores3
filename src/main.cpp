@@ -88,8 +88,8 @@ namespace {
 // Firmware-Stand. Bei jeder neuen Version mitpflegen - steht auf der
 // Statusseite und im Startprotokoll und gehoert zum Eintrag im CHANGELOG.
 // ---------------------------------------------------------------------------
-constexpr const char* kFwVersion = "1.4.0";
-constexpr const char* kFwDate    = "2026-09-27";
+constexpr const char* kFwVersion = "1.5.0";
+constexpr const char* kFwDate    = "2026-10-18";
 
 // ---------------------------------------------------------------------------
 // Zeiten und Grenzwerte
@@ -365,6 +365,7 @@ static_assert(kSettingsCount == static_cast<size_t>(kSetItemCount),
 enum WifiMenuId : uint8_t {
   kWifiDirect = 0,     // Direktmodus an/aus (eigener Accesspoint)
   kWifiDirectNet,      // Adressbereich des Direktnetzes
+  kWifiDirectNum,      // Nummer des Direktnetzes (mehrere Geraete an einem Tisch)
   kWifiScanNow,
   kWifiFromSd,
   kWifiPortal,
@@ -379,6 +380,7 @@ enum WifiMenuId : uint8_t {
 constexpr const char* kWifiMenuItems[kWifiMenuCount] = {
     "Direktmodus",
     "Direkt-Netz",
+    "Direkt-Nr.",
     "Netz suchen",
     "Von SD laden",
     "Setup-Portal",
@@ -1820,6 +1822,30 @@ bool gWifiNoted = false;
 // Wie beim Setup-Portal ohne Station-Teil: eine aktive STA wuerde im
 // Hintergrund nach dem Heimnetz suchen, dabei den Kanal wechseln und den c64u
 // immer wieder aus dem Netz werfen.
+// Nummer des Direktnetzes. Mehrere Geraete im Direktmodus an einem Tisch
+// brauchen verschiedene Netznamen, sonst bucht sich ein c64u womoeglich beim
+// falschen ein: "C64uRemote-Direct-1" bis "-9". Ohne Nummer bleibt der alte
+// Name. Die Nummer steckt nur im Netznamen (gDirectSsid), ein ueber
+// /wifi.txt frei gesetzter Name gilt als "frei" (-1).
+int directNumFromSsid(const String& ssid) {
+  if (ssid == kDirectSsidDef) return 0;
+  const String prefix = String(kDirectSsidDef) + "-";
+  if (ssid.length() == prefix.length() + 1 && ssid.startsWith(prefix)) {
+    const char c = ssid[ssid.length() - 1];
+    if (c >= '1' && c <= '9') return c - '0';
+  }
+  return -1;
+}
+
+// Funkkanal: ohne Nummer wie bisher 6, mit Nummer reihum 1, 6, 11 - die drei
+// Kanaele im 2,4-GHz-Band, die sich nicht ueberlappen.
+uint8_t directChannel() {
+  const int num = directNumFromSsid(gDirectSsid);
+  if (num <= 0) return kDirectChannel;
+  static const uint8_t kChannels[3] = {1, 6, 11};
+  return kChannels[(num - 1) % 3];
+}
+
 void startDirectAp(uint32_t now) {
   app.lastWiFiAttemptMs = now;
   if (app.portalActive) return;          // Portal hat Vorrang, danach geht es hier weiter
@@ -1838,7 +1864,7 @@ void startDirectAp(uint32_t now) {
   // Erst den AP starten, dann die Adressen setzen. Andersherum bleibt je nach
   // Core-Version die Vorgabe 192.168.4.1 stehen - beim Setup-Portal faellt das
   // nicht auf, weil es genau diese Adresse benutzt.
-  gDirectApUp = WiFi.softAP(gDirectSsid.c_str(), gDirectPass.c_str(), kDirectChannel,
+  gDirectApUp = WiFi.softAP(gDirectSsid.c_str(), gDirectPass.c_str(), directChannel(),
                             0 /*sichtbar*/, kDirectMaxClients);
   delay(100);
   // Der DHCP-Server vergibt ab <netz>.64 - wer zuerst kommt, bekommt die .64.
@@ -1994,6 +2020,137 @@ void serviceWiFi(uint32_t now) {
   if (app.lastWiFiAttemptMs == 0 || now - app.lastWiFiAttemptMs >= kWiFiRetryMs) beginWiFi(now);
 }
 
+// ---------------------------------------------------------------------------
+// Nicht blockierender Vortest (wie beim M5Dial)
+//
+// Ist der c64u aus oder nicht im Netz, wartet jeder HTTP-Aufruf bis zum Ablauf
+// der Verbindungsfrist (bis zu drei Versuche) - so lange steht die Schleife,
+// und Tasten und Bild reagieren nicht. Solange der c64u als nicht erreichbar
+// gilt, klopft der regelmaessige Statustest deshalb zuerst mit einem nicht
+// blockierenden TCP-Aufbau an Port 80 an. Die Schleife laeuft dabei weiter;
+// erst wenn sich der c64u meldet, folgt die eigentliche HTTP-Abfrage.
+// ---------------------------------------------------------------------------
+enum class ProbeState { Pending, Answered, Silent, NotPossible };
+
+int      gProbeFd      = -1;
+uint32_t gProbeStartMs = 0;
+bool     gProbeSent    = false;
+uint32_t gProbeSentMs  = 0;
+constexpr uint32_t kProbeConnectMs = 4500;
+constexpr uint32_t kProbeReplyMs   = 3000;
+
+void probeAbort() {
+  if (gProbeFd >= 0) {
+    ::close(gProbeFd);
+    gProbeFd = -1;
+  }
+  gProbeSent = false;
+}
+
+ProbeState probeStart(uint32_t now) {
+  probeAbort();
+  rfidFieldOff();
+  // Nur mit einer reinen IP-Adresse - ein Hostname braeuchte eine blockierende
+  // Namensaufloesung, dann wie bisher direkt per HTTP fragen.
+  IPAddress ip;
+  if (!ip.fromString(targetHost())) return ProbeState::NotPossible;
+
+  const int fd = ::socket(AF_INET, SOCK_STREAM, 0);
+  if (fd < 0) return ProbeState::NotPossible;
+  ::fcntl(fd, F_SETFL, ::fcntl(fd, F_GETFL, 0) | O_NONBLOCK);
+
+  struct sockaddr_in addr;
+  memset(&addr, 0, sizeof(addr));
+  addr.sin_family      = AF_INET;
+  addr.sin_port        = htons(80);
+  addr.sin_addr.s_addr = static_cast<uint32_t>(ip);
+  if (::connect(fd, reinterpret_cast<struct sockaddr*>(&addr), sizeof(addr)) < 0 &&
+      errno != EINPROGRESS) {
+    ::close(fd);
+    return ProbeState::Silent;
+  }
+  gProbeFd      = fd;
+  gProbeStartMs = now;
+  return ProbeState::Pending;
+}
+
+// Schaut ohne zu warten nach, wie weit der Vortest ist. Er schickt eine
+// vollstaendige Anfrage und liest die Antwort bis zum Ende: Der HTTP-Server
+// im c64u bedient nur eine Verbindung zur Zeit, eine halb offene Verbindung
+// soll ihn nicht aufhalten.
+ProbeState probePoll(uint32_t now) {
+  if (gProbeFd < 0) return ProbeState::Silent;
+
+  if (!gProbeSent) {
+    fd_set writable;
+    FD_ZERO(&writable);
+    FD_SET(gProbeFd, &writable);
+    struct timeval noWait = {0, 0};
+    const int ready = ::select(gProbeFd + 1, nullptr, &writable, nullptr, &noWait);
+    if (ready == 0) {
+      if (now - gProbeStartMs < kProbeConnectMs) return ProbeState::Pending;
+      probeAbort();
+      return ProbeState::Silent;
+    }
+    int       sockErr = -1;
+    socklen_t len     = sizeof(sockErr);
+    if (ready > 0) ::getsockopt(gProbeFd, SOL_SOCKET, SO_ERROR, &sockErr, &len);
+    if (sockErr != 0) {
+      probeAbort();
+      // ECONNREFUSED: der c64u ist da und hat nur gerade abgewiesen.
+      return sockErr == ECONNREFUSED ? ProbeState::Answered : ProbeState::Silent;
+    }
+    String req = "GET /v1/version HTTP/1.1\r\nHost: " + targetHost() + "\r\n";
+    if (!targetPassword().isEmpty()) req += "X-Password: " + targetPassword() + "\r\n";
+    req += "Connection: close\r\n\r\n";
+    ::send(gProbeFd, req.c_str(), req.length(), 0);
+    gProbeSent   = true;
+    gProbeSentMs = now;
+    return ProbeState::Pending;
+  }
+
+  char buf[128];
+  for (;;) {
+    const int n = ::recv(gProbeFd, buf, sizeof(buf), MSG_DONTWAIT);
+    if (n > 0) continue;
+    if (n < 0 && (errno == EAGAIN || errno == EWOULDBLOCK) &&
+        now - gProbeSentMs < kProbeReplyMs) {
+      return ProbeState::Pending;
+    }
+    break;   // 0 = c64u hat geschlossen, sonst Fehler oder Frist abgelaufen
+  }
+  probeAbort();
+  // Die Verbindung stand - der c64u ist da. Den Rest klaert der normale Weg.
+  return ProbeState::Answered;
+}
+
+void markTargetMissing() {
+  app.connection.targetReachable = false;
+  app.connection.authOk          = false;
+  app.connection.detail          = "Target unreachable";
+  directNextCandidate();
+}
+
+// Entscheidet, ob die (blockierende) HTTP-Statusabfrage jetzt laufen soll.
+// Gilt der c64u als nicht erreichbar, wird erst nicht blockierend angeklopft.
+bool probeDue(uint32_t now) {
+  if (gProbeFd >= 0) {
+    const ProbeState state = probePoll(now);
+    if (state == ProbeState::Pending) return false;
+    if (state == ProbeState::Silent) { markTargetMissing(); return false; }
+    return true;
+  }
+  if (app.lastConnectionProbeMs != 0 && now - app.lastConnectionProbeMs < kConnectionProbeMs) {
+    return false;
+  }
+  if (app.connection.targetReachable) return true;
+  app.lastConnectionProbeMs = now;
+  const ProbeState state = probeStart(now);
+  if (state == ProbeState::NotPossible) return true;
+  if (state == ProbeState::Silent) markTargetMissing();
+  return false;
+}
+
 void refreshConnectionStatus(uint32_t now, bool force = false) {
   const bool wasOk   = app.connection.wifiConnected && app.connection.authOk;
   const bool wasWifi = app.connection.wifiConnected;
@@ -2031,8 +2188,8 @@ void refreshConnectionStatus(uint32_t now, bool force = false) {
     app.connection.targetReachable = false;
     app.connection.authOk          = false;
     app.connection.detail          = "WiFi disconnected";
-  } else if (force || app.lastConnectionProbeMs == 0 ||
-             now - app.lastConnectionProbeMs >= kConnectionProbeMs) {
+  } else if (force || probeDue(now)) {
+    probeAbort();
     app.lastConnectionProbeMs = now;
 
     const ApiResponse reach = sendApiRequest("GET", "/v1/version", false);
@@ -2972,6 +3129,7 @@ void loadNetConfig() {
 // Alles, was zur alten Verbindung gehoert (Statustest, gefundene Adresse,
 // CPU-Wert), wird verworfen - danach wird frisch geprueft.
 void resetDirectState() {
+  probeAbort();
   app.connection            = ConnectionState();
   app.lastConnectionProbeMs = 0;
   app.currentCpuValue       = "Unknown";
@@ -3001,6 +3159,18 @@ void setDirectMode(bool on, uint32_t now, bool reconnect = true) {
 void setDirectNet(const String& net, uint32_t now) {
   if (!directNetValid(net) || net == gDirectNet) return;
   gDirectNet = net;
+  saveNetConfig();
+  resetDirectState();
+  if (gDirectMode && !app.portalActive) {
+    stopDirectAp();
+    startDirectAp(now);
+  }
+}
+
+// Neue Netznummer (0 = ohne Nummer). Laeuft der Direktmodus, startet der AP
+// mit neuem Namen und Kanal gleich neu.
+void setDirectNum(int num, uint32_t now) {
+  gDirectSsid = num <= 0 ? String(kDirectSsidDef) : String(kDirectSsidDef) + "-" + String(num);
   saveNetConfig();
   resetDirectState();
   if (gDirectMode && !app.portalActive) {
@@ -5726,6 +5896,10 @@ String wifiMenuValue(size_t index) {
   switch (index) {
     case kWifiDirect:       return gDirectMode ? "an" : "aus";
     case kWifiDirectNet:    return gDirectNet;
+    case kWifiDirectNum: {
+      const int num = directNumFromSsid(gDirectSsid);
+      return num < 0 ? String("frei") : num == 0 ? String("-") : String(num);
+    }
     case kWifiScanNow:
       return app.wifiScanCount == 0 ? String("suchen")
                                     : String(static_cast<unsigned>(app.wifiScanCount));
@@ -6333,6 +6507,14 @@ void wifiMenuSelect(uint32_t now) {
       setDirectNet(gDirectNet == kDirectNetDef ? String(kDirectNetAlt) : String(kDirectNetDef), now);
       setModal(String("NETZ ") + gDirectNet + ".x", kColInfo, now, 1800);
       break;
+
+    case kWifiDirectNum: {
+      // 0 (ohne Nummer), 1 ... 9, dann wieder 0
+      const int num = directNumFromSsid(gDirectSsid);
+      setDirectNum(num < 0 ? 1 : (num + 1) % 10, now);
+      setModal(gDirectSsid, kColInfo, now, 1800);
+      break;
+    }
 
     case kWifiScanNow:
       wifiStartScan(now);
@@ -7837,7 +8019,7 @@ void loop() {
   if (app.screen == ScreenMode::Home) updateHomeDemo(now);
 
   // CPU-Wert einmalig nachladen, sobald das WLAN steht
-  if (netReady() && app.currentCpuValue == "Unknown" &&
+  if (netReady() && app.connection.targetReachable && app.currentCpuValue == "Unknown" &&
       app.screen == ScreenMode::Home) {
     refreshCpuValue();
   }

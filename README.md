@@ -13,6 +13,12 @@ M5StickC Plus2 / M5Dial / M5Stack Core von Martin Oswald (@mad, https://1MHz.de)
 
 ---
 
+## Firmware im Browser installieren
+
+Wer nur die fertige Firmware braucht, spart sich die Programmierumgebung: Auf
+**https://1mhz.de/M5-webflash/** lässt sie sich in Chrome oder Edge per USB-Kabel aufspielen (esptool-js), wahlweise mit deutscher oder englischer Oberfläche. Die Images dort
+enthalten keine Zugangsdaten; WLAN und c64u werden danach am Gerät eingerichtet.
+
 ## 1. Programmierumgebung
 
 **Empfehlung: PlatformIO in Visual Studio Code.** Grund: die Konfiguration

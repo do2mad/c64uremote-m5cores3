@@ -2,6 +2,60 @@
 
 C64uRemote für den **M5Stack CoreS3**. Neueste Version zuerst.
 
+## v1.5.0 – 2026-10-18
+
+### Deutsch
+
+**Neu: mehrere Geräte im Direktmodus an einem Tisch.** Bisher hießen alle
+Direktnetze `C64uRemote-Direct` – zwei Fernbedienungen nebeneinander kamen sich
+in die Quere.
+
+- Neuer Eintrag im WLAN-Menü: **Direkt-Nr.** Jeder Druck schaltet von *-* (ohne
+  Nummer) über `C64uRemote-Direct-1` bis `-9` und zurück. Der neue Name wird kurz
+  angezeigt; ein laufendes Direktnetz startet sofort damit neu.
+- Jede Nummer nutzt ihren eigenen Funkkanal (1, 6, 11 im Wechsel); ohne Nummer
+  bleibt es bei Kanal 6.
+- Am c64u den jeweiligen Netznamen eintragen. Eine `direct_ssid` mit Nummer in der `wifi.txt` wirkt genauso.
+
+**Neu: Firmware im Browser installieren.** Für alle, die keine
+Programmierumgebung einrichten möchten: Fertige Images lassen sich über
+https://1mhz.de/M5-webflash/ in Chrome oder Edge per USB-Kabel auf den CoreS3 spielen (esptool-js).
+Die Images enthalten keine Zugangsdaten; WLAN und c64u werden danach wie gewohnt
+per Karte, `wifi.txt` oder Setup-Portal eingerichtet.
+
+**Bedienung hakt nicht mehr, wenn der c64u fehlt.** Ist der c64u aus oder
+nicht im Netz, stand der CoreS3 bisher alle 15 Sekunden für bis zu fünf Sekunden
+still, während er auf eine Antwort wartete – Tasten und Menü reagierten so
+lange nicht. Jetzt klopft er erst ohne Warten an (wie der M5Dial seit v1.3.1),
+und erst wenn sich der c64u meldet, folgt die eigentliche Abfrage. Der CPU-Takt
+wird erst nachgeladen, wenn der c64u erreichbar ist.
+
+### English
+
+**New: several devices in direct mode at one table.** Until now every direct
+network was called `C64uRemote-Direct` – two remotes side by side got in each
+other's way.
+
+- New entry in the WiFi menu: **Direct no.** Every press steps from *-* (no
+  number) through `C64uRemote-Direct-1` to `-9` and back. The new name is shown
+  briefly; a running direct network restarts with it right away.
+- Each number uses its own radio channel (1, 6, 11 in turn); without a number it
+  stays on channel 6.
+- Enter the matching network name on the c64u. A numbered `direct_ssid` in `wifi.txt` works the same way.
+
+**New: install the firmware in the browser.** For everyone who does not want to
+set up a development environment: ready-made images can be flashed onto the CoreS3
+from https://1mhz.de/M5-webflash/ in Chrome or Edge over a USB cable (esptool-js). The images
+contain no credentials; WiFi and the c64u are then set up as usual by card,
+`wifi.txt` or setup portal.
+
+**Operation no longer stalls when the c64u is missing.** If the c64u was off
+or not on the network, the CoreS3 used to freeze for up to five seconds every 15
+seconds while waiting for an answer – buttons and menu did not respond. Now it
+first knocks without waiting (like the M5Dial since v1.3.1), and only when the
+c64u answers does the real query follow. The CPU speed is only fetched once the
+c64u is reachable.
+
 ## v1.4.0 – 2026-09-27
 
 ### Deutsch
