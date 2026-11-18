@@ -589,6 +589,55 @@ card may stay where it is.
 - *Scan networks* also works in direct mode. During the scan the c64u may
   briefly lose contact; it reconnects by itself afterwards.
 
+# Waking the c64u (Wake on LAN)
+
+From c64u firmware **1.2** on, the c64u can be woken over WiFi – the CoreS3 sends
+a wake-up call for it. Set it up once:
+
+1. On the c64u, enable **Wake on LAN** under **Power Settings** in the menu.
+2. Connect the CoreS3 to the c64u once while it is switched on. The CoreS3 then keeps
+   the c64u's WiFi address (MAC) – nothing else is needed.
+
+The wake-up goes over WiFi, to the MAC address, not to the IP address.
+
+## Waking
+
+If the c64u is off or cannot be reached, POWER wakes instead of switching off.
+The **POWER** tile then reads **WAKE**. Tapping it opens the request. This also applies right after switching the CoreS3 on, as long as the
+c64u has not answered yet.
+
+The request reads **"Wake c64u?"** with NO and YES (YES preselected).
+Tapping **YES** (green) wakes at once, tapping **NO** (red) closes the request. Tapping elsewhere does nothing.
+
+After **YES**, *WAKE-UP SENT* appears. The CoreS3 repeats the wake-up call every
+0.7 seconds for 30 seconds until the c64u answers – a sleeping c64u only listens
+to the WiFi at intervals. **One YES is enough**; it may take a few seconds until
+the c64u starts up.
+
+If the CoreS3's WiFi is not up yet (right after switching on), *WAKE-UP FOLLOWS WHEN
+WIFI IS UP* appears. The call then goes out by itself as soon as the connection
+is there.
+
+If the c64u drops out during operation, the request opens **once by itself**
+after a few seconds. If it stays unanswered for 20 seconds, it closes again –
+that counts as NO. Nothing is ever woken without confirmation.
+
+## In direct mode
+
+Waking also works in direct mode; the call then goes into the CoreS3's own WiFi.
+If no c64u is logged in, POWER reads WAKE right away. The request only opens by
+itself there when a device is logged in (the sleeping c64u) and no c64u answers
+for 15 seconds. Whether waking works depends on whether the sleeping c64u stays
+logged in to the direct network.
+
+## Good to know
+
+- If the CoreS3 cannot wake at all – the c64u's MAC is not known yet or no WiFi is
+  set up –, POWER reports *c64u NOT REACHABLE*.
+- The MAC can also be set in `wifi.txt`: `mac = 00:11:22:33:44:55`.
+- The status page shows *WoL ok* once a MAC is known.
+- While the c64u is running, POWER stays the normal power-off with confirmation.
+
 # Settings overview
 
 In **Setup**, after the NFC actions, you find all settings. They are stored

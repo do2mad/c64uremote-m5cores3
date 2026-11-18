@@ -597,6 +597,56 @@ also liegen bleiben.
 - *Netz suchen* funktioniert auch im Direktmodus. Während der Suche kann der
   c64u kurz den Kontakt verlieren; er meldet sich danach von selbst wieder an.
 
+# c64u wecken (Wake on LAN)
+
+Ab der c64u-Firmware **1.2** lässt sich der c64u über das WLAN aufwecken – der
+CoreS3 schickt dafür einen Weckruf. Einmal einrichten:
+
+1. Am c64u im Menü unter **Power Settings** die Einstellung **Wake on LAN**
+   einschalten.
+2. Den c64u einmal eingeschaltet mit dem CoreS3 verbinden. Der CoreS3 merkt sich dabei
+   die WLAN-Adresse (MAC) des c64u dauerhaft – mehr ist nicht nötig.
+
+Geweckt wird über das WLAN, und zwar an die MAC-Adresse, nicht an die IP-Adresse.
+
+## Wecken
+
+Ist der c64u aus oder nicht erreichbar, weckt POWER statt auszuschalten.
+Die Kachel **POWER** heißt dann **WECKEN**. Ein Tipp darauf öffnet die Rückfrage. Das gilt auch direkt nach dem Einschalten des CoreS3, solange der c64u
+noch nicht geantwortet hat.
+
+Die Rückfrage lautet **„c64u wecken?“** mit NEIN und JA (Vorauswahl JA).
+Ein Tipp auf **JA** (grün) weckt sofort, ein Tipp auf **NEIN** (rot) schließt die Rückfrage. Daneben tippen bewirkt nichts.
+
+Nach **JA** erscheint *WECKRUF GESENDET*. Der CoreS3 wiederholt den Weckruf
+30 Sekunden lang alle 0,7 Sekunden, bis der c64u antwortet – ein schlafender c64u
+hört nur in Abständen ins WLAN. **Einmal JA genügt**; es kann ein paar Sekunden
+dauern, bis der c64u hochfährt.
+
+Steht das WLAN des CoreS3 noch nicht (gleich nach dem Einschalten), erscheint
+*WECKRUF FOLGT, SOBALD WLAN DA*. Der Weckruf geht dann von selbst hinaus, sobald
+die Verbindung steht.
+
+Fällt der c64u im Betrieb weg, öffnet sich die Rückfrage nach ein paar Sekunden
+**einmal von selbst**. Bleibt sie 20 Sekunden unbeantwortet, schließt sie sich
+wieder – das zählt als NEIN. Ohne Bestätigung wird nie geweckt.
+
+## Im Direktmodus
+
+Auch im Direktmodus lässt sich wecken; der Weckruf geht dann in das eigene
+Funknetz des CoreS3. Ist kein c64u angemeldet, heißt POWER sofort WECKEN. Von selbst
+gefragt wird dort nur, wenn ein Gerät angemeldet ist (der schlafende c64u) und
+15 Sekunden lang kein c64u antwortet. Ob das Wecken klappt, hängt davon ab, ob
+der schlafende c64u im Direktnetz angemeldet bleibt.
+
+## Gut zu wissen
+
+- Kann der CoreS3 gar nicht wecken – die MAC des c64u ist noch unbekannt oder es ist
+  kein WLAN eingerichtet –, meldet POWER *c64u NICHT ERREICHBAR*.
+- Die MAC lässt sich auch in der `wifi.txt` vorgeben: `mac = 00:11:22:33:44:55`.
+- Die Statusseite zeigt *WoL ok*, sobald eine MAC bekannt ist.
+- Läuft der c64u, bleibt POWER das normale Ausschalten mit Abfrage.
+
 # Einstellungen im Überblick
 
 Im **Setup** findest du nach den NFC-Aktionen alle Einstellungen. Sie werden
